@@ -8,12 +8,64 @@ import "https://github.com/transmissions11/solmate/blob/main/src/tokens/ERC721.s
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract DXOptions is ERC721("DX Derivative", "DXDV"), Ownable {
-    using Counters for Counters.Counter;
-    Counters.Counter tokenId;
+library libTypes {
+    enum OptionType {
+        CALL,
+        PUT
+    }
 
-    function mint(address recipient) public onlyOwner {
-        _safeMint(recipient, tokenId.current());
+    struct Options {
+        OptionType optionType;
+        // IERC20 assetAddr;
+        uint256 amount;
+        uint256 strikePrice;
+        uint256 expiration;
+        address assetHolder;
+        // address optionHolder;
+    }
+}
+
+contract DXOptions is ERC721("DX Derivative", "DXDV"), Ownable {
+    // enum OptionType {
+    //     CALL,
+    //     PUT
+    // }
+    // struct Options {
+    //     OptionType optionType;
+    //     // IERC20 assetAddr;
+    //     uint256 amount;
+    //     uint256 strikePrice;
+    //     uint256 expiration;
+    //     address assetHolder;
+    // }
+
+    mapping(uint256 => libTypes.Options) public optionDetails;
+
+    // mapping(uint256 => address) internal _ownerOf;
+    // mapping(address => uint256) internal _balanceOf;
+
+    using Counters for Counters.Counter;
+    Counters.Counter tokenIds;
+
+    function mint(
+        address _recipient,
+        libTypes.OptionType _optionType,
+        uint256 _amount,
+        uint256 _strikePrice,
+        uint256 _expiration,
+        address _assetHolder
+    ) public onlyOwner returns (uint256) {
+        uint256 tokenId = tokenIds.current();
+        _safeMint(_recipient, tokenId);
+        tokenIds.increment();
+        optionDetails[tokenId] = libTypes.Options(
+            _optionType,
+            _amount,
+            _strikePrice,
+            _expiration,
+            _assetHolder
+        );
+        return tokenId;
     }
 
     function tokenURI(uint256 id) public pure override returns (string memory) {
@@ -27,27 +79,27 @@ contract DXDerivative {
 
     event OpenedNewBuyProposal(uint256 proposalId, Proposal);
     event OpenedNewSellProposal(uint256 proposalId, Proposal);
-    event FilledProposal(Options);
-    event ExpiredOptions(Options); //after seller claims? may not actually need perhaps
-    event ExecutedOptions(Options);
+    event FilledProposal(uint256 proposalId, uint256 optionsId);
+    event ExpiredOptions(libTypes.Options); //after seller claims? may not actually need perhaps
+    event ExecutedOptions(libTypes.Options);
 
-    enum OptionType {
-        CALL,
-        PUT
-    }
+    // enum OptionType {
+    //     CALL,
+    //     PUT
+    // }
 
-    struct Options {
-        OptionType optionType;
-        IERC20 assetAddr;
-        uint256 amount;
-        uint256 strikePrice;
-        uint256 expiration;
-        address assetHolder;
-        address optionHolder;
-    }
+    // struct Options {
+    //     OptionType optionType;
+    //     IERC20 assetAddr;
+    //     uint256 amount;
+    //     uint256 strikePrice;
+    //     uint256 expiration;
+    //     address assetHolder;
+    //     address optionHolder;
+    // }
 
     struct Proposal {
-        OptionType optionType;
+        libTypes.OptionType optionType;
         IERC20 assetAddr;
         uint256 amount;
         uint256 strikePrice;
@@ -58,11 +110,13 @@ contract DXDerivative {
 
     mapping(uint256 => Proposal) buyProposals;
     mapping(uint256 => Proposal) sellProposals;
-    mapping(uint256 => Options) filledOptions;
-    mapping(uint256 => Options) expiredOptions;
-    mapping(uint256 => Options) executedOptions;
+    mapping(uint256 => libTypes.Options) filledOptions;
+    mapping(uint256 => libTypes.Options) expiredOptions;
+    mapping(uint256 => libTypes.Options) executedOptions;
     Counters.Counter buyProposalIds;
     Counters.Counter sellProposalIds;
+
+    DXOptions optionFactory = new DXOptions();
 
     function createOpenBuyCall(
         IERC20 asset,
@@ -76,7 +130,7 @@ contract DXDerivative {
             "Expiration must be at least a week from now"
         );
         Proposal memory proposed = Proposal(
-            OptionType.CALL,
+            libTypes.OptionType.CALL,
             asset,
             amount,
             strikePrice,
@@ -101,7 +155,7 @@ contract DXDerivative {
             "Expiration must be at least a week from now"
         );
         Proposal memory proposed = Proposal(
-            OptionType.PUT,
+            libTypes.OptionType.PUT,
             asset,
             amount,
             strikePrice,
@@ -124,7 +178,25 @@ contract DXDerivative {
             buyProposals[proposalId].isActive == true,
             "This proposal is not active"
         );
+
+        (
+            libTypes.OptionType optionType,
+            ,
+            uint256 amount,
+            uint256 strikePrice,
+            uint256 expiration,
+            address proposer
+        ) = buyProposals[proposalId];
         // mint Options
+        uint256 optionsId = optionFactory.mint(
+            proposer,
+            optionType,
+            amount,
+            strikePrice,
+            expiration,
+            msg.sender
+        );
+        emit FilledProposal(proposalId, optionsId);
     }
     //execute options
     //claim expired options
