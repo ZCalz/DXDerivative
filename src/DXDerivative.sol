@@ -1,15 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
-import "./libOptions.sol";
+import "./library/DXTypes.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import {DXOptions} from "./DXOptions.sol";
 
 contract DXDerivative {
     using Counters for Counters.Counter;
 
-    event OpenedNewBuyProposal(uint256 proposalId, Proposal);
-    event OpenedNewSellProposal(uint256 proposalId, Proposal);
+    event OpenedNewBuyProposal(uint256 proposalId, Proposal, string OptionType);
+    event OpenedNewSellProposal(
+        uint256 proposalId,
+        Proposal,
+        string OptionType
+    );
     event FilledProposal(uint256 proposalId, uint256 optionsId);
     event ExpiredOptions(libTypes.Options); //after seller claims? may not actually need perhaps
     event ExecutedOptions(libTypes.Options);
@@ -40,12 +44,12 @@ contract DXDerivative {
         optionFactory = new DXOptions();
     }
 
-    function createOpenBuyCall(
+    function proposeBuyCall(
         IERC20 asset,
         uint256 amount,
         uint256 strikePrice,
         uint256 expiration
-    ) public {
+    ) public returns (uint256) {
         //calculate option price, require msg.value = price
         require(
             expiration > block.timestamp + 7 days,
@@ -63,16 +67,17 @@ contract DXDerivative {
         uint256 currentId = buyProposalIds.current();
         buyProposals[currentId] = proposed;
         userBuyProposals[msg.sender].push(currentId);
-        emit OpenedNewBuyProposal(currentId, proposed);
+        emit OpenedNewBuyProposal(currentId, proposed, "CALL");
         buyProposalIds.increment();
+        return currentId;
     }
 
-    function createOpenBuyPut(
+    function proposeBuyPut(
         IERC20 asset,
         uint256 amount,
         uint256 strikePrice,
         uint256 expiration
-    ) public {
+    ) public returns (uint256) {
         //calculate option price, require msg.value = price
         require(
             expiration > block.timestamp + 7 days,
@@ -90,12 +95,15 @@ contract DXDerivative {
         uint256 currentId = buyProposalIds.current();
         buyProposals[currentId] = proposed;
         userBuyProposals[msg.sender].push(currentId);
-        emit OpenedNewBuyProposal(currentId, proposed);
+        emit OpenedNewBuyProposal(currentId, proposed, "PUT");
         buyProposalIds.increment();
+        return currentId;
     }
 
     /// fill proposals
-    function fillBuyOption(uint256 proposalId) public payable {
+    function fillBuyProposal(
+        uint256 proposalId
+    ) public payable returns (uint256) {
         Proposal memory info = buyProposals[proposalId];
         require(
             info.amount <= msg.value,
@@ -107,6 +115,7 @@ contract DXDerivative {
         uint256 optionsId = optionFactory.mint(
             info.proposer,
             info.optionType,
+            info.assetAddr,
             info.amount,
             info.strikePrice,
             info.expiration,
@@ -114,6 +123,7 @@ contract DXDerivative {
         );
 
         emit FilledProposal(proposalId, optionsId);
+        return optionsId;
     }
     //execute options
     //claim expired options

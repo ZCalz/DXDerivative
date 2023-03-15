@@ -2,7 +2,7 @@
 pragma solidity ^0.8.13;
 
 // import "@solmate/tokens/ERC721.sol";
-import "https://github.com/transmissions11/solmate/blob/main/src/tokens/ERC721.sol";
+import "@solmate/tokens/ERC721.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./library/DXTypes.sol";
@@ -16,6 +16,7 @@ contract DXOptions is ERC721("DX Derivative", "DXDV"), Ownable {
     function mint(
         address _recipient,
         libTypes.OptionType _optionType,
+        IERC20 _assetAddr,
         uint256 _amount,
         uint256 _strikePrice,
         uint256 _expiration,
@@ -26,6 +27,7 @@ contract DXOptions is ERC721("DX Derivative", "DXDV"), Ownable {
         tokenIds.increment();
         optionDetails[tokenId] = libTypes.Options(
             _optionType,
+            _assetAddr,
             _amount,
             _strikePrice,
             _expiration,

@@ -11,7 +11,7 @@ library libTypes {
 
     struct Options {
         OptionType optionType;
-        // IERC20 assetAddr;
+        IERC20 assetAddr;
         uint256 amount;
         uint256 strikePrice;
         uint256 expiration;
