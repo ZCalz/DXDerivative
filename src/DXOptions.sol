@@ -5,7 +5,7 @@ pragma solidity ^0.8.13;
 import "https://github.com/transmissions11/solmate/blob/main/src/tokens/ERC721.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "./libOptions.sol";
+import "./library/DXTypes.sol";
 
 contract DXOptions is ERC721("DX Derivative", "DXDV"), Ownable {
     mapping(uint256 => libTypes.Options) public optionDetails;
