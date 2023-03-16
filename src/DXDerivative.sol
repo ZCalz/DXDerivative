@@ -15,8 +15,8 @@ contract DXDerivative {
         string OptionType
     );
     event FilledProposal(uint256 proposalId, uint256 optionsId);
-    event ExpiredOptions(libTypes.Options); //after seller claims? may not actually need perhaps
-    event ExecutedOptions(libTypes.Options);
+    event ExpiredOptions(libTypes.Options, string optionType); //after seller claims? may not actually need perhaps
+    event ExecutedOptions(libTypes.Options, string optionType);
 
     struct Proposal {
         libTypes.OptionType optionType;
@@ -32,7 +32,7 @@ contract DXDerivative {
     mapping(uint256 => Proposal) sellProposals;
     mapping(uint256 => libTypes.Options) public filledOptions;
     mapping(uint256 => libTypes.Options) expiredOptions;
-    mapping(uint256 => libTypes.Options) public executedOptions;
+    mapping(uint256 => bool) public executedOptions;
     mapping(address => uint256[]) userBuyProposals;
     mapping(address => uint256[]) userSellProposals;
     Counters.Counter public buyProposalIds;
@@ -156,6 +156,94 @@ contract DXDerivative {
         emit FilledProposal(proposalId, optionsId);
         return optionsId;
     }
+
     //execute options
+    modifier canExecute(uint256 optionId) {
+        require(
+            optionFactory.ownerOf(optionId) == msg.sender,
+            "You do not own this option contract token"
+        );
+        // (, , , , uint256 expiration, ) = optionFactory.optionDetails(optionId);
+        require(
+            optionFactory.getOptionDetails(optionId).expiration <=
+                block.timestamp,
+            "This option already expired"
+        );
+        _;
+    }
+
+    //need to get approval from option executor to transfer erc20 tokens to obligator
+    function executeCall(uint256 optionId) public canExecute(optionId) {
+        (
+            libTypes.OptionType optionType,
+            address assetAddr,
+            uint256 amount,
+            uint256 strikePrice,
+            ,
+            address assetObligator
+        ) = optionFactory.getOptionDetails(optionId);
+        require(
+            optionType == libTypes.OptionType.CALL,
+            "This is not a CALL option"
+        );
+        require(
+            IERC20(assetAddr).balanceOf(msg.sender) >= amount * strikePrice,
+            "You do not have enough tokens to pay the counter party. Tokens Needed: (amount) x (strike price)"
+        );
+        require(amount <= address(this).balance, "Dapp has insufficient funds");
+        (bool sent, ) = (msg.sender).call{value: amount}("");
+        require(sent, "Failed to send Ether");
+        executedOptions[optionId] = true;
+        IERC20(assetAddr).transferFrom(
+            msg.sender,
+            assetObligator,
+            amount * strikePrice
+        );
+        emit ExecutedOptions(optionFactory.getOptionDetails(optionId), "CALL");
+    }
+
+    function executePut(uint256 optionId) public payable canExecute(optionId) {
+        (
+            libTypes.OptionType optionType,
+            address assetAddr,
+            uint256 amount,
+            uint256 strikePrice,
+            ,
+            address assetObligator
+        ) = optionFactory.getOptionDetails(optionId);
+        require(
+            optionType == libTypes.OptionType.PUT,
+            "This is not a PUT option"
+        );
+        require(
+            IERC20(assetAddr).balanceOf(address(this)) >= amount * strikePrice,
+            "Dapp does not have enough tokens to pay the counter party. Tokens Needed: (amount) x (strike price)"
+        );
+        require(
+            msg.value >= amount,
+            "You can not sending enough ether to cover (amount) specified in options"
+        );
+
+        //send directly to obligator or have them claim?
+        // require(amount <= address(this).balance, "You have insufficient ether to sell to the counter party");
+        // (bool sent, ) = (msg.sender).call{value: amount}("");
+        // require(sent, "Failed to send Ether");
+
+        executedOptions[optionId] = true;
+        //send tokens to option executor from dapp contract
+        IERC20(assetAddr).transferFrom(
+            address(this),
+            msg.sender,
+            amount * strikePrice
+        );
+        emit ExecutedOptions(optionFactory.getOptionDetails(optionId), "PUT");
+    }
+
+    //need to get from put execution --- or send directly from put
+    function withdrawlFromExecutedOption(uint256 optionId) public {}
+
     //claim expired options
+    function withdrawlUnfilledProposal(uint256 proposalId) public {}
+
+    function withdrawlExpiredOptionObligation(uint256 optionId) public {}
 }

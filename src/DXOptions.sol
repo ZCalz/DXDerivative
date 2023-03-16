@@ -20,7 +20,7 @@ contract DXOptions is ERC721("DX Derivative", "DXDV"), Ownable {
         uint256 _amount,
         uint256 _strikePrice,
         uint256 _expiration,
-        address _assetHolder
+        address _assetObligator
     ) public onlyOwner returns (uint256) {
         uint256 tokenId = tokenIds.current();
         _safeMint(_recipient, tokenId);
@@ -31,7 +31,7 @@ contract DXOptions is ERC721("DX Derivative", "DXDV"), Ownable {
             _amount,
             _strikePrice,
             _expiration,
-            _assetHolder
+            _assetObligator
         );
         return tokenId;
     }
@@ -39,5 +39,11 @@ contract DXOptions is ERC721("DX Derivative", "DXDV"), Ownable {
     function tokenURI(uint256 id) public pure override returns (string memory) {
         id + id;
         return "URI";
+    }
+
+    function getOptionDetails(
+        uint256 id
+    ) public returns (libTypes.Options memory) {
+        return optionDetails[id];
     }
 }
