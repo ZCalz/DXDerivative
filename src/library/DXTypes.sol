@@ -15,7 +15,7 @@ library libTypes {
         uint256 amount;
         uint256 strikePrice;
         uint256 expiration;
-        address assetHolder;
+        address assetObligator;
         // address optionHolder;
     }
 }

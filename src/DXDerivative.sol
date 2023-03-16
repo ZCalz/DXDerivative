@@ -101,16 +101,47 @@ contract DXDerivative {
     }
 
     /// fill proposals
-    function fillBuyProposal(
+    function fillBuyCallProposal(
         uint256 proposalId
     ) public payable returns (uint256) {
         Proposal memory info = buyProposals[proposalId];
         require(
-            info.amount <= msg.value,
+            info.amount * 1 ether <= msg.value,
             "Expected asset amount requirements not met"
         );
         require(info.isActive == true, "This proposal is not active");
         buyProposals[proposalId].isActive = false;
+        // mint Options
+        uint256 optionsId = optionFactory.mint(
+            info.proposer,
+            info.optionType,
+            info.assetAddr,
+            info.amount,
+            info.strikePrice,
+            info.expiration,
+            msg.sender
+        );
+
+        emit FilledProposal(proposalId, optionsId);
+        return optionsId;
+    }
+
+    function fillBuyPutProposal(
+        uint256 proposalId
+    ) public payable returns (uint256) {
+        Proposal memory info = buyProposals[proposalId];
+        require(
+            info.amount * info.strikePrice <=
+                IERC20(info.assetAddr).balanceOf(msg.sender),
+            "Expected asset amount requirements not met"
+        );
+        require(info.isActive == true, "This proposal is not active");
+        buyProposals[proposalId].isActive = false;
+        IERC20(info.assetAddr).transferFrom(
+            msg.sender,
+            address(this),
+            info.amount * info.strikePrice
+        );
         // mint Options
         uint256 optionsId = optionFactory.mint(
             info.proposer,
