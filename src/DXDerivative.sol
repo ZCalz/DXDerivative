@@ -35,6 +35,12 @@ contract DXDerivative {
     mapping(uint256 => bool) public executedOptions;
     mapping(address => uint256[]) userBuyProposals;
     mapping(address => uint256[]) userSellProposals;
+
+    mapping(address => uint256) public ethAvailableForWithdrawl;
+    //not needed bc it automatically executes
+    // mapping(address => mapping(IERC20 => uint256))
+    //     public tokensAvailableForWithdrawl;
+
     Counters.Counter public buyProposalIds;
     Counters.Counter sellProposalIds;
 
@@ -176,12 +182,12 @@ contract DXDerivative {
     function executeCall(uint256 optionId) public canExecute(optionId) {
         (
             libTypes.OptionType optionType,
-            address assetAddr,
+            IERC20 assetAddr,
             uint256 amount,
             uint256 strikePrice,
             ,
             address assetObligator
-        ) = optionFactory.getOptionDetails(optionId);
+        ) = optionFactory.optionDetails(optionId);
         require(
             optionType == libTypes.OptionType.CALL,
             "This is not a CALL option"
@@ -205,12 +211,12 @@ contract DXDerivative {
     function executePut(uint256 optionId) public payable canExecute(optionId) {
         (
             libTypes.OptionType optionType,
-            address assetAddr,
+            IERC20 assetAddr,
             uint256 amount,
             uint256 strikePrice,
             ,
             address assetObligator
-        ) = optionFactory.getOptionDetails(optionId);
+        ) = optionFactory.optionDetails(optionId);
         require(
             optionType == libTypes.OptionType.PUT,
             "This is not a PUT option"
@@ -236,14 +242,83 @@ contract DXDerivative {
             msg.sender,
             amount * strikePrice
         );
+        ethAvailableForWithdrawl[assetObligator] += msg.value;
         emit ExecutedOptions(optionFactory.getOptionDetails(optionId), "PUT");
     }
 
     //need to get from put execution --- or send directly from put
-    function withdrawlFromExecutedOption(uint256 optionId) public {}
+    //call option does not need one bc it directly sends tokens to obligator
+    function withdrawlFromExecutedOption() public {
+        require(
+            ethAvailableForWithdrawl[msg.sender] > 0,
+            "There are no funds to withdraw"
+        );
+        require(
+            ethAvailableForWithdrawl[msg.sender] <= address(this).balance,
+            "Dapp has insufficient funds"
+        );
+        (bool sent, ) = (msg.sender).call{
+            value: ethAvailableForWithdrawl[msg.sender]
+        }("");
+        require(sent, "Failed to send Ether");
+    }
 
     //claim expired options
-    function withdrawlUnfilledProposal(uint256 proposalId) public {}
 
-    function withdrawlExpiredOptionObligation(uint256 optionId) public {}
+    //only for sell options that have funds locked?
+    // function withdrawlUnfilledProposal(uint256 proposalId) public {
+    //     require(buyProposals[proposalId].isActive == true);
+    //     require(buyProposals[proposalId].proposer == msg.sender);
+    //     buyProposals[proposalId].isActive = false;
+    // }
+
+    function removeProposal(uint256 proposalId) public {
+        require(buyProposals[proposalId].isActive == true);
+        require(buyProposals[proposalId].proposer == msg.sender);
+        buyProposals[proposalId].isActive = false;
+    }
+
+    function withdrawlExpiredOptionObligation(uint256 optionId) public {
+        (
+            libTypes.OptionType optionType,
+            IERC20 assetAddr,
+            uint256 amount,
+            uint256 strikePrice,
+            uint256 expiration,
+            address assetObligator
+        ) = optionFactory.optionDetails(optionId);
+        require(
+            optionFactory.ownerOf(optionId) == msg.sender &&
+                assetObligator == msg.sender,
+            "You do not own this option"
+        );
+        require(
+            expiration <= block.timestamp,
+            "The option has not expired yet"
+        );
+        optionFactory.burnOption(optionId);
+        if (optionType == libTypes.OptionType.CALL) {
+            //obligator is returned eth
+            require(
+                amount <= address(this).balance,
+                "Dapp has insufficient funds"
+            );
+            (bool sent, ) = (msg.sender).call{value: amount}("");
+            require(sent, "Failed to send Ether");
+        } else if (optionType == libTypes.OptionType.PUT) {
+            //obligator is returned token
+            require(
+                IERC20(assetAddr).balanceOf(address(this)) >=
+                    amount * strikePrice,
+                "Dapp does not have enough tokens to pay the counter party. Tokens Needed: (amount) x (strike price)"
+            );
+            IERC20(assetAddr).transferFrom(
+                address(this),
+                msg.sender,
+                amount * strikePrice
+            );
+        } else {
+            revert("Option type not supported");
+        }
+    }
 }

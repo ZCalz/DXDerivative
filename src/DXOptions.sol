@@ -46,4 +46,8 @@ contract DXOptions is ERC721("DX Derivative", "DXDV"), Ownable {
     ) public returns (libTypes.Options memory) {
         return optionDetails[id];
     }
+
+    function burnOption(uint256 id) public onlyOwner {
+        _burn(id);
+    }
 }
