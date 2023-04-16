@@ -1,0 +1,6 @@
+{
+  "id": "clg2hcgtl0000mq088kocdp1c",
+  "name": "platform-site",
+  "distDir": "out",
+  "buildCommand": "yarn build"
+}

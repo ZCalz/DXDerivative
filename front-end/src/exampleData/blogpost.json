@@ -1,0 +1,40 @@
+{
+  "posts": [
+    {
+      "id": 1,
+      "title": "Getting Started with TailwindCSS",
+      "excerpt": "Learn how to get started with TailwindCSS and create beautiful websites with ease.",
+      "image": "/images/tailwind.png",
+      "author": {
+        "name": "John Smith",
+        "avatar": "/images/avatar.jpg"
+      },
+      "date": "2022-03-28",
+      "content": "<p>In this post, we'll explore the basics of TailwindCSS and how to get started using it in your projects. We'll cover everything from installation to building responsive layouts and customizing your styles with utilities.</p><p>By the end of this post, you'll have a solid understanding of how to use TailwindCSS and be well on your way to creating beautiful, responsive websites with ease.</p>"
+    },
+    {
+      "id": 2,
+      "title": "The Benefits of TypeScript",
+      "excerpt": "Discover the benefits of using TypeScript and why it's quickly becoming one of the most popular programming languages.",
+      "image": "/images/typescript.png",
+      "author": {
+        "name": "Jane Doe",
+        "avatar": "/images/avatar.jpg"
+      },
+      "date": "2022-02-14",
+      "content": "<p>Are you tired of spending hours debugging your JavaScript code? Do you want a more robust and reliable way to write your web applications? If so, then TypeScript might be the answer.</p><p>In this post, we'll explore the benefits of using TypeScript and why it's quickly becoming one of the most popular programming languages for web development.</p>"
+    },
+    {
+      "id": 3,
+      "title": "Creating Custom React Hooks",
+      "excerpt": "Learn how to create custom React hooks to improve the reusability of your code and simplify your application logic.",
+      "image": "/images/react.png",
+      "author": {
+        "name": "Bob Johnson",
+        "avatar": "/images/avatar.jpg"
+      },
+      "date": "2022-01-02",
+      "content": "<p>React hooks are a powerful way to encapsulate and reuse logic in your React components. In this post, we'll explore how to create custom hooks to improve the reusability of your code and simplify your application logic.</p><p>We'll cover everything from basic hook creation to advanced techniques like using the useReducer hook for state management.</p>"
+    }
+  ]
+}

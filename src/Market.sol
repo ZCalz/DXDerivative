@@ -66,18 +66,26 @@ contract Market {
         _;
     }
 
-    modifier allowableMarket(address seller, uint256 tokenId) {
+    modifier allowableMarketEdits(uint256 marketId, uint256 tokenId) {
         require(
             tokenIsListed[tokenId].market == true,
             "This token is not an active market listing"
         );
+        require(
+            msg.sender == assetOnMarket[marketId].seller,
+            "You are not the owner of this listing"
+        );
         _;
     }
 
-    modifier allowableAuction(address seller, uint256 tokenId) {
+    modifier allowableAuctionEdits(uint256 _auctionId, uint256 tokenId) {
         require(
             tokenIsListed[tokenId].auction == true,
             "This token is not an active auction listing"
+        );
+        require(
+            msg.sender == assetOnAuction[auctionId].seller,
+            "You are not the owner of this listing"
         );
         require(
             assetOnAuction[tokenId].currentHighestBid == 0,
@@ -125,13 +133,13 @@ contract Market {
         marketIds.increment();
     }
 
-    function modifyListing(
+    function modifyListingPrice(
         uint256 _marketId,
         uint256 _newPrice
     )
         public
         onlyAssetOwner(msg.sender, assetOnSale[_marketId].seller)
-        allowableMarket(assetOnSale[_marketId].tokenId)
+        allowableMarketEdits(_marketId, assetOnSale[_marketId].tokenId)
     {
         //require listing currently active
         assetOnSale[_marketId].price = _newPrice;
@@ -143,7 +151,7 @@ contract Market {
     )
         public
         // onlyAssetOwner(msg.sender, tokenId)
-        allowableMarket(assetOnSale[_marketId].tokenId)
+        allowableMarketEdits(_marketId, assetOnSale[_marketId].tokenId)
         nonReentrant //?
     {
         //require listing currently active
@@ -153,8 +161,9 @@ contract Market {
             tokenId
         );
         tokenIsListed[_tokenId].market = false;
-        assetOnSale[_marketId].isActive = false;
+        assetOnMarket[_marketId].isActive = false;
         //send option contract back to user?
+        _dxOptionsContract.transferFrom(address(this), msg.sender, tokenId);
     }
 
     function buyAsset(uint256 _marketId) public payable nonReentrant {
@@ -163,6 +172,7 @@ contract Market {
             "You cannot buy your own listing"
         );
         uint256 memory price = assetOnSale[_marketId].price;
+        uint256 memory tokenId = assetOnSale[_marketId].tokenId;
         require(msg.value >= price, "Did not sent enough to pay for listing");
 
         //payment spliter?
@@ -171,9 +181,11 @@ contract Market {
         }("");
         require(sent, "Failed to send Ether");
 
+        assetOnMarket[_marketId].sold = true;
+        assetOnMarket[_marketId].isActive = false;
+        tokenIsListed[tokenId].market = false;
+        _dxOptionsContract.transferFrom(address(this), msg.sender, tokenId);
         emit MarketItemSold(_marketId, tokenId, msg.sender);
-        tokenIsListed[_tokenId].sold = true;
-        tokenIsListed[_tokenId].market = false;
     }
 
     //AUCTIONS
@@ -184,7 +196,7 @@ contract Market {
     ) public onlyAssetOwner(msg.sender, tokenId) {
         require(
             tokenIsListed[tokenId].auction == false,
-            "Item already listed in market listing"
+            "Item already listed in auction listing"
         );
         _dxOptionsContract.transferFrom(msg.sender, address(this), tokenId);
         tokenIsListed[_tokenId].auction = true;
@@ -202,22 +214,77 @@ contract Market {
         auctionIds.increment();
     }
 
-    function claimWinningBid() public {}
+    function modifyAuctionMinBid(
+        uint256 auctionId,
+        uint256 newMinBid
+    ) public allowableAuction(auctionId, assetOnAuction[auctionId].tokenId) {
+        require(
+            assetOnAuction[auctionId].isActive == true,
+            "Has to be an active listing."
+        );
+        assetOnAuction[auctionId].minBid = newMinBid;
+    }
 
-    function modifyAuctionInfo() public allowableAuction(tokenId) {}
+    function modifyAuctionExpiration(
+        uint256 auctionId,
+        uint256 newExpiration
+    )
+        public
+        allowableAuctionEdits(auctionId, assetOnAuction[auctionId].tokenId)
+    {
+        require(
+            assetOnAuction[auctionId].isActive == true,
+            "Has to be an active listing."
+        );
+        assetOnAuction[auctionId].expiration = newExpiration;
+    }
 
-    function removeAuction() public allowableAuction(tokenId) {}
+    function removeAuction(
+        uint256 auctionId
+    )
+        public
+        allowableAuctionEdits(auctionId, assetOnAuction[auctionId].tokenId)
+    {
+        require(
+            assetOnAuction[auctionId].isActive == true,
+            "Has to be an active listing."
+        );
+        uint256 tokenId = assetOnSale[auctionId].tokenId;
+        _dxOptionsContract.transferFrom(
+            address(this),
+            assetOnSale[auctionId].seller,
+            tokenId
+        );
+        tokenIsListed[tokenId].auction = false;
+        assetOnAuction[auctionId].isActive = false;
+        _dxOptionsContract.transferFrom(address(this), msg.sender, tokenId);
+    }
 
-    function bidOnAsset() public payable nonReentrant {} //
+    // method for handling bids and highest bidder. Do the funds lock and unlock for each bidder?
+    function bidOnAsset(uint256 auctionId) public payable nonReentrant {
+        require(
+            assetOnAuction[auctionId].expiration > block.timestamp,
+            "The auction has already ended"
+        );
+    } //
+
+    function claimWinningBid(uint256 auctionId) public {
+        require(
+            assetOnAuction[auctionId].expiration < block.timestamp,
+            "The auction has not ended yet"
+        );
+        //only highest bidder can call this function
+        tokenIsListed[_tokenId].auction = false;
+    }
 
     //for items not listed or to make new offer from existing offers with price acceptable to buyer
     function createOffer() public payable nonReentrant {}
 
-    function getListedAssets() public {}
+    // function getListedAssets() public {}
 
-    function getAssetsOnAuction() public {}
+    // function getAssetsOnAuction() public {}
 
-    function registerDerivativeOnMarketPlace() public {
-        //supports derivative type required
-    }
+    // function registerDerivativeOnMarketPlace() public {
+    //     //supports derivative type required
+    // }
 }
