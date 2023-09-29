@@ -12,7 +12,7 @@ contract DXOptions is ERC721("DX Derivative", "DXDV"), Ownable {
     mapping(uint256 => libTypes.Options) public optionDetails;
     using Counters for Counters.Counter;
 
-    Counters.Counter tokenIds;
+    Counters.Counter _tokenIds;
 
     function mint(
         address _recipient,
@@ -23,9 +23,9 @@ contract DXOptions is ERC721("DX Derivative", "DXDV"), Ownable {
         uint256 _expiration,
         address _assetObligator
     ) public onlyOwner returns (uint256) {
-        uint256 tokenId = tokenIds.current();
+        uint256 tokenId = _tokenIds.current();
         _safeMint(_recipient, tokenId);
-        tokenIds.increment();
+        _tokenIds.increment();
         optionDetails[tokenId] = libTypes.Options(
             _optionType,
             _assetAddr,
@@ -61,19 +61,19 @@ contract DXOptions is ERC721("DX Derivative", "DXDV"), Ownable {
                 "</text></svg>"
             )
         );
-        console.log("\n--------------------");
-        console.log(finalSvg);
-        console.log("--------------------\n");
+        // console.log("\n--------------------");
+        // console.log(finalSvg);
+        // console.log("--------------------\n");
 
         // We'll be setting the tokenURI later!
-        _setTokenURI(newItemId, "blah");
+        // _setTokenURI(newItemId, "blah");
 
         _tokenIds.increment();
-        console.log(
-            "An NFT w/ ID %s has been minted to %s",
-            newItemId,
-            msg.sender
-        );
+        // console.log(
+        //     "An NFT w/ ID %s has been minted to %s",
+        //     newItemId,
+        //     msg.sender
+        // );
     }
 
     function tokenURI(uint256 id) public pure override returns (string memory) {
